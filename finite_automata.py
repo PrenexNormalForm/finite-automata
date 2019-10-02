@@ -56,14 +56,17 @@ class NFA:
                     return False
         return True
     
-    def accepts(swe, string: str) -> bool:
+    def accepts(swe, string) -> bool:
         '''
         Determines if the given string is accepted by the NFA.
         
-        string: The string to feed to the DFA
+        string: The string to feed to the DFA. This should be a sequence of
+        symbols. It does not necessarily have to be of str type. Consecutive
+        elements '\' and 'e' of the sequence will not be translated to '\e'.
         '''
         current_states = swe._traverse_epsilon_transitions({swe.start})
         for symbol in string:
+            symbol = swe._translate_epsilon(symbol)
             current_states = swe._transition(current_states, symbol)
             #return False if the set of current states is the empty set
             if not current_states:
@@ -76,6 +79,8 @@ class NFA:
         Transitions the NFA from a given set of states to a new set of states
         using the given symbol.
         '''
+        if symbol == swe.empty_string:
+            return states
         new_states = set()
         for state in states:
             if (state, symbol) in swe.transitions.keys():
@@ -196,23 +201,24 @@ def sadri_nfa(filename: str) -> NFA:
     with open(filename, 'r') as f:
         reading_transitions = False
         transitions = []
-        states = {}
+        states = set()
         for line in f:
             line = line.lower().strip()
-            if line.startswith('number of states:'):
-                num_states = int(line.split()[-1])
-            elif line.startswith('alphabet:'):
+            if line.startswith('alphabet:'):
                 alphabet = set(line.split()[1:])
             elif line.startswith('start state:'):
                 start_state = line.split()[-1]
             elif line.startswith('accept states:'):
-                accept = set(line.split()[1:])
+                accept = set(line.split()[2:])
             elif reading_transitions:
                 if line == 'transitions end':
                     reading_transitions = False
                 else:
+                    transition = line.split()
                     transitions.append(line.split())
-                    states.add(transitions[-1][0])
+                    #add every state in the transition to the states set
+                    #the second element of the list is a symbol, not a state
+                    states |= set(transition[:1] + transition[2:])
             elif line == 'transitions begin':
                 reading_transitions = True
     return NFA(states, alphabet, transitions, start_state, accept)
@@ -223,14 +229,19 @@ if __name__ == '__main__':
     if len(sys.argv) == 2:
         try:
             nfa = sadri_nfa(sys.argv[1])
+            print('The finite automaton is defined as', nfa)
             while True:
                 print('Enter string: ', end='')
                 string = input()
-                accepted = nfa.accepts(string)
+                if not string:
+                    exit()
+                accepted = nfa.accepts(string.replace('\e', ''))
                 not_str = 'not ' if not accepted else ''
-                print(f'The string {string} is {not_str} accepted.')
+                print(f'The string {string} is {not_str}accepted.')
         except FileNotFoundError:
             print('File not found.')
+        except ValueError as e:
+            print('Error:', e)
         except KeyboardInterrupt:
             pass
     else:

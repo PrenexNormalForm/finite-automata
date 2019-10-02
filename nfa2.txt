@@ -1,0 +1,24 @@
+% This is the NFA for the regular expression a(a U bb)*ba, using the algorithm
+% described by lemma 1.55 on page 67 of the text
+
+% lol my program doesn't actually listen to the number of states
+nor does it care about random lines like this
+Number of states: 345234562523562345
+Alphabet: a b
+Transitions begin
+1 a 2
+2 e 3
+3 e 4 11
+4 e 5 7
+5 a 6
+6 e 4 11
+7 b 8
+8 e 9
+9 b 10
+10 e 4 11
+11 b 12
+12 e 13
+13 a 14
+Transitions end
+Start state: 1
+Accept states: 14
