@@ -1,0 +1,17 @@
+% INPUT (for DFA of Q3 of Test1)
+% accepts strings with an odd number of a's that end in bb
+% Simplified version
+Number of states: 4
+Transitions begin
+1 a 2
+1 b 1
+2 a 1
+2 b 3
+3 a 1
+3 b 4
+4 a 1
+4 b 4
+Transitions end
+Start state: 1
+Accept states: 4
+
