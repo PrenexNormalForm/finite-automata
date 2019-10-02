@@ -192,7 +192,7 @@ class DFA(NFA):
             raise ValueError('DFA must be deterministic')
 
 
-def sadri_nfa(filename: str) -> NFA:
+def sadri_nfa(filename: str, dfa=False) -> NFA:
     '''
     Reads in the given Sadri-syntax NFA file and constructs an NFA from it.
     
@@ -222,14 +222,17 @@ def sadri_nfa(filename: str) -> NFA:
                     states |= set(transition[:1] + transition[2:])
             elif line == 'transitions begin':
                 reading_transitions = True
+    if dfa:
+        return DFA(states, alphabet, transitions, start_state, accept)
     return NFA(states, alphabet, transitions, start_state, accept)
     
 
 if __name__ == '__main__':
     import sys
-    if len(sys.argv) == 2:
+    if len(sys.argv) >= 2:
+        deterministic = '--dfa' in sys.argv
         try:
-            nfa = sadri_nfa(sys.argv[1])
+            nfa = sadri_nfa(sys.argv[-1], dfa = deterministic)
             print('The finite automaton is defined as', nfa)
             while True:
                 print('Enter string: ', end='')
@@ -246,4 +249,4 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             pass
     else:
-        print('Usage: python finite_automata.py <filename>')
+        print('Usage: python finite_automata.py [--dfa] <filename>')
