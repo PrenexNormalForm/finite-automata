@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+#Author: Eva Moniz
 #Note: swe means self
 
 class NFA:    
