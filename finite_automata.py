@@ -8,7 +8,8 @@ class NFA:
             alphabet: iter, 
             transitions: iter, 
             start, 
-            accept: iter):
+            accept: iter,
+            empty_string=r'\e'):
         r'''
         Creates a nondeterministic finite automaton out of the given elements.
         
@@ -28,7 +29,10 @@ class NFA:
             considered to be the empty string.
         start: the start state
         accept: an iterable of accepting states
+        empty_string: the immutable object to consider the empty string on
+            transition edges
         '''
+        swe.empty_string = empty_string
         swe.states = set(states)
         swe.alphabet = set(alphabet)
         swe.transitions = swe._convert_transitions(transitions)
@@ -71,8 +75,8 @@ class NFA:
         new_states = set()
         while unchecked_states:
             for state in unchecked_states:
-                if (state, '\e') in swe.transitions.keys():
-                    new_states |= swe.transitions[(state, '\e')]
+                if (state, swe.empty_string) in swe.transitions.keys():
+                    new_states |= swe.transitions[(state, swe.empty_string)]
             unchecked_states = new_states - final_states
             final_states |= new_states
             new_states = set()
@@ -80,11 +84,11 @@ class NFA:
     
     def _translate_epsilon(swe, symbol: str) -> bool:
         r'''
-        Returns '\e' if the given symbol should be considered to be the empty
-        string. Otherwise, returns the symbol
+        Returns empty string if the given symbol should be considered to be the 
+        empty string. Otherwise, returns the symbol
         '''
         if symbol == 'e' and 'e' not in swe.alphabet:
-            return r'\e'
+            return swe.empty_string
         return symbol
     
     def _convert_transitions(swe, transitions) -> dict:
@@ -104,10 +108,13 @@ class NFA:
                 except (TypeError, ValueError):
                     raise ValueError("Transition mapping  must have"
                             "(state, symbol) tuple as keys")
-                #if val is iterable, create a set of states out of it
+                #if val is iterable (not str), create a set of states out of it
                 #otherwise, create a set with it as the only element
                 try:
-                    resulting_states = set(val)
+                    if type(val) is str:
+                        resulting_states = {val}
+                    else:
+                        resulting_states = set(val)
                 except TypeError:
                     resulting_states = {val}
                 symbol = swe._translate_epsilon(symbol)
@@ -124,6 +131,19 @@ class NFA:
                 symbol = _translate_epsilon(symbol)
                 transition_mapping[(state,symbol)] = set(result)
         return transition_mapping
+        
+    def __str__(swe):
+        from pprint import pformat
+        string = '(Q,\u03A3,\u03B4,q\u2080,F), where:\n'
+        string += f'Q = {swe.states}\n'
+        string += f'\u03A3 = {swe.alphabet}\n'
+        string += f'\u03B4 is a function defined by the map\n'
+        string += ''.join(f'  {line}\n' for line in 
+                pformat(swe.transitions).splitlines())
+        string += f'q\u2080 = {swe.start}\n'
+        string += f'F = {swe.accept}'
+        return string
+        
 
 
 def sadri_nfa(filename: str) -> NFA:
@@ -138,24 +158,25 @@ def sadri_nfa(filename: str) -> NFA:
 
 
 def _test1():
-    epsilon = '\e'
+    epsilon = r'\e'
     q1, q2, q3, q4, q5 = 'q1', 'q2', 'q3', 'q4', 'q5'
     states = (q1, q2, q3, q4, q5)
-    alphabet = [0,1]
+    alphabet = ['0','1']
     transitions = {
         (q1, epsilon): [q2, q4],
-        (q2, 0): q2,
-        (q2, 1): q3,
-        (q3, 0): (q3),
-        (q3, 1): q2,
-        (q4, 0): q5,
-        (q4, 1): q4,
-        (q5, 0): q5,
-        (q5, 1): q4,
+        (q2, '0'): q2,
+        (q2, '1'): q3,
+        (q3, '0'): (q3),
+        (q3, '1'): q2,
+        (q4, '0'): q5,
+        (q4, '1'): q4,
+        (q5, '0'): q5,
+        (q5, '1'): q4,
     }
     start = q1
     accepting = {q3, q5}
     nfa = NFA(states, alphabet, transitions, start, accepting)
+    print(str(nfa))
     
     tests = {
         '': False,
@@ -178,3 +199,5 @@ def _test1():
         result = nfa.accepts(test_case)
         print(f'"{test_case}": expected {expected}, got {result}.',
                 'passed.' if result == expected else 'failed.')
+    
+    return nfa
