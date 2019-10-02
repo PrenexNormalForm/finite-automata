@@ -1,14 +1,14 @@
 #!/usr/bin/python3
-#Note: swe = self = this
+#Note: swe means self
 
 class NFA:    
     def __init__(
             swe, 
-            states: iter, 
-            alphabet: iter, 
-            transitions: iter, 
+            states, 
+            alphabet, 
+            transitions, 
             start, 
-            accept: iter,
+            accept,
             empty_string=r'\e'):
         r'''
         Creates a nondeterministic finite automaton out of the given elements.
@@ -37,9 +37,24 @@ class NFA:
         swe.alphabet = set(alphabet)
         swe.transitions = swe._convert_transitions(transitions)
         swe.start = start
-        if start not in swe.states:
-            raise ValueError("Start state must be in the set of states")
         swe.accept = set(accept)
+        swe._validate()
+    
+    def is_deterministic(swe) -> bool:
+        #ensure that no epsilon transitions exist, that no transition points to
+        #more than one state
+        for (state, symbol), states in swe.transitions.items():
+            if symbol == swe.empty_string:
+                return False
+            if len(states) != 1:
+                return False
+        #ensure that all elements of the alphabet are
+        #accounted for in the transitions for every state
+        for state in swe.states:
+            for symbol in swe.alphabet:
+                if (state, symbol) not in swe.transitions.keys():
+                    return False
+        return True
     
     def accepts(swe, string: str) -> bool:
         '''
@@ -50,6 +65,7 @@ class NFA:
         current_states = swe._traverse_epsilon_transitions({swe.start})
         for symbol in string:
             current_states = swe._transition(current_states, symbol)
+            #return False if the set of current states is the empty set
             if not current_states:
                 return False
             current_states = swe._traverse_epsilon_transitions(current_states)
@@ -67,6 +83,10 @@ class NFA:
         return new_states
     
     def _traverse_epsilon_transitions(swe, states: set) -> set:
+        '''
+        Calculates the set of all states reachable by epsilon transitions from
+        the given set of states
+        '''
         #accumulator of all states in the traversal
         final_states = set(states)
         #the states which have not already been checked for epsilon transitions
@@ -128,9 +148,22 @@ class NFA:
                 except (TypeError, ValueError):
                     raise ValueError('Transition mapping must provide a state'
                             'and symbol for each transition')
-                symbol = _translate_epsilon(symbol)
+                symbol = swe._translate_epsilon(symbol)
                 transition_mapping[(state,symbol)] = set(result)
         return transition_mapping
+    
+    def _validate(swe):
+        if swe.start not in swe.states:
+            raise ValueError("Start state must be in the set of states")
+        if not swe.accept <= swe.states:
+            raise ValueError("Accepting states must be a subset of states")
+        for (state, symbol), states in swe.transitions.items():
+            if state not in swe.states:
+                raise ValueError(f"Transition function contains invalid state {state}")
+            if symbol not in swe.alphabet and symbol != swe.empty_string:
+                raise ValueError(f'Transition function contains invalid symbol {symbol}')
+            if not states <= swe.states:
+                raise ValueError(f'Transition function contains invalid states {states}')
         
     def __str__(swe):
         from pprint import pformat
@@ -141,9 +174,16 @@ class NFA:
         string += ''.join(f'  {line}\n' for line in 
                 pformat(swe.transitions).splitlines())
         string += f'q\u2080 = {swe.start}\n'
-        string += f'F = {swe.accept}'
+        string += f'F = {swe.accept}\n'
+        string += f'and {swe.empty_string} is considered to be the empty string.'
         return string
-        
+
+
+class DFA(NFA):
+    def __init__(swe, *args):
+        super().__init__(*args)
+        if not swe.is_deterministic():
+            raise ValueError('DFA must be deterministic')
 
 
 def sadri_nfa(filename: str) -> NFA:
@@ -154,50 +194,44 @@ def sadri_nfa(filename: str) -> NFA:
     returns: the NFA specified by the file
     '''
     with open(filename, 'r') as f:
-        pass
+        reading_transitions = False
+        transitions = []
+        states = {}
+        for line in f:
+            line = line.lower().strip()
+            if line.startswith('number of states:'):
+                num_states = int(line.split()[-1])
+            elif line.startswith('alphabet:'):
+                alphabet = set(line.split()[1:])
+            elif line.startswith('start state:'):
+                start_state = line.split()[-1]
+            elif line.startswith('accept states:'):
+                accept = set(line.split()[1:])
+            elif reading_transitions:
+                if line == 'transitions end':
+                    reading_transitions = False
+                else:
+                    transitions.append(line.split())
+                    states.add(transitions[-1][0])
+            elif line == 'transitions begin':
+                reading_transitions = True
+    return NFA(states, alphabet, transitions, start_state, accept)
+    
 
-
-def _test1():
-    epsilon = r'\e'
-    q1, q2, q3, q4, q5 = 'q1', 'q2', 'q3', 'q4', 'q5'
-    states = (q1, q2, q3, q4, q5)
-    alphabet = ['0','1']
-    transitions = {
-        (q1, epsilon): [q2, q4],
-        (q2, '0'): q2,
-        (q2, '1'): q3,
-        (q3, '0'): (q3),
-        (q3, '1'): q2,
-        (q4, '0'): q5,
-        (q4, '1'): q4,
-        (q5, '0'): q5,
-        (q5, '1'): q4,
-    }
-    start = q1
-    accepting = {q3, q5}
-    nfa = NFA(states, alphabet, transitions, start, accepting)
-    print(str(nfa))
-    
-    tests = {
-        '': False,
-        '0': True,
-        '1': True,
-        '11': False,
-        '110': True,
-        '111': True,
-        '101': False,
-        '1110': True,
-        '1111': False,
-        '011': False,
-        '01': True,
-        '0101': False,
-        '010100000000001': True,
-        '000000000000011': False,
-    }
-    
-    for test_case, expected in tests.items():
-        result = nfa.accepts(test_case)
-        print(f'"{test_case}": expected {expected}, got {result}.',
-                'passed.' if result == expected else 'failed.')
-    
-    return nfa
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) == 2:
+        try:
+            nfa = sadri_nfa(sys.argv[1])
+            while True:
+                print('Enter string: ', end='')
+                string = input()
+                accepted = nfa.accepts(string)
+                not_str = 'not ' if not accepted else ''
+                print(f'The string {string} is {not_str} accepted.')
+        except FileNotFoundError:
+            print('File not found.')
+        except KeyboardInterrupt:
+            pass
+    else:
+        print('Usage: python finite_automata.py <filename>')
