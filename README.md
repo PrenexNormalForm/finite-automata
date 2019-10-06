@@ -1,4 +1,4 @@
-#Finite Automata
+# Finite Automata
 
 Simulates deterministic and nondeterministic finite automata.
 
